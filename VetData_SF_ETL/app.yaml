@@ -1,1 +1,6 @@
 runtime: python39
+
+handlers:
+
+- url: /task/loader
+  script: main.py

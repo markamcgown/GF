@@ -1,0 +1,4 @@
+cron:
+ - description: "SF Loader"
+  url: /task/loader
+  schedule: every 1 hour
