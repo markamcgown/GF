@@ -46,7 +46,7 @@ def sfLibraries():
       sql = "USE SCHEMA VET_SCHEMA"
       cur_write.execute(sql)
 
-      sql = f'DELETE FROM {str.upper(table)}_TEMP_{str.upper(env)}'
+      sql = f"DELETE FROM {str.upper(table)}_TEMP_{str.upper(env)}"
       cur_write.execute(sql)
 
       def make_url(mode,header,table,days,user,passw):
