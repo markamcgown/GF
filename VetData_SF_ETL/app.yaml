@@ -3,4 +3,4 @@ runtime: python37
 handlers:
 
 - url: /task/loader
-  script: main.py
+  script: auto
