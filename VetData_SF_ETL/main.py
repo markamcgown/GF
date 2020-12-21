@@ -8,7 +8,7 @@ from flask import Flask
 
 app = Flask(__name__)
 
-@app.route('/')
+@app.route('/task/loader')
 def sfLibraries():
     url = r'https://api.vetdata.net/InstallationList'
     user = 'futurepet'
