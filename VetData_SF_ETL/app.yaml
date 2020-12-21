@@ -1,6 +1,6 @@
-runtime: python39
+runtime: python37
 
 handlers:
 
 - url: /task/loader
-  script: auto
+  script: main.py
