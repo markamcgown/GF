@@ -5,7 +5,7 @@ asn1crypto==1.4.0
 azure-common==1.1.25
 azure-core==1.8.2
 azure-storage-blob==2.1.0
-boto3==6.6.6
+boto3==1.10.8
 botocore==6.6.6
 certifi==2020.6.20
 cffi==6.6.6
