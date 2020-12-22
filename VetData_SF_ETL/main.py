@@ -15,7 +15,7 @@ def sfLibraries():
     user = 'futurepet'
     passw = 'f32fb415-478e-4be7-9884-8f59f9adb11b'
     env = 'PROD'#'STG'
-    tables = ['Invoices']
+    tables = ['Invoices','Transactions']
 
     def get_installations(url,user,passw):
         r = requests.get(url,auth=(user,passw))
@@ -78,7 +78,7 @@ def sfLibraries():
         df = pd.DataFrame()
         result = pd.DataFrame()
         while((i==0) or (len(df)==top)):
-          url = make_url('latest',header,'Invoices',2,user,passw)
+          url = make_url('latest',header,table,2,user,passw)
           url_mod = url.replace('<<<Skip>>>',str(i)).replace('<<<Top>>>',str(top))
           r = requests.get(url_mod,auth=(user,passw),headers=header)
           t = [i for i in r.json().values()]
