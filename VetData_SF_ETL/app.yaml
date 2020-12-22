@@ -6,4 +6,3 @@ handlers:
 
 - url: /task/loader
   script: auto
-  login: admin
