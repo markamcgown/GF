@@ -93,7 +93,7 @@ def load_aws():
     cur_write.close()
     conn_write.close()
     
-    return 'Success'
+  return 'Success'
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
