@@ -15,7 +15,7 @@ def sfLibraries():
     user = 'futurepet'
     passw = 'f32fb415-478e-4be7-9884-8f59f9adb11b'
     env = 'PROD'#'STG'
-    tables = ['Invoices','Transactions','Clients','Patients']
+    tables = ['Invoices','Transactions','Clients','Patients','Codes']
 
     def get_installations(url,user,passw):
         r = requests.get(url,auth=(user,passw))
