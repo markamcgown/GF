@@ -1,9 +1,0 @@
-service: aws_loader
-runtime: python38
-
-instance_class: F4_1G
-
-handlers:
-
-- url: /task/aws_loader
-  script: auto
