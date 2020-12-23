@@ -97,7 +97,7 @@ def sfLibraries():
               result = pd.DataFrame()
           i += top
 
-      keys = ['INSTALLATIONID','ID']
+      keys = ['INSTALLATIONID','ID','APILASTCHANGEDATE']
       key_columns = ','.join(keys)
       fields = df_to_sf.columns.tolist()
       field_columns = ','.join(fields)

@@ -1,0 +1,9 @@
+service: vetdata-loader
+runtime: python38
+
+instance_class: F4_1G
+
+handlers:
+
+- url: /task/loader
+  script: auto

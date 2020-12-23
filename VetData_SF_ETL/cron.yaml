@@ -1,4 +1,5 @@
 cron:
-- description: "SF Loader"
+- description: "VetData SF Loader"
   url: /task/loader
   schedule: every 12 hours
+  target: vetdata-loader
