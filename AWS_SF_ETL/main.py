@@ -24,6 +24,8 @@ def load_aws():
         host="ec2-34-235-198-233.compute-1.amazonaws.com",
         port='5432'
     )
+
+    curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
     conn_write = snow.connect(user="PROD_USER",
     password="F32fb415-478e-4be7-9884-8f59f9adb11b",
