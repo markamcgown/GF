@@ -1,0 +1,4 @@
+cron:
+- description: "AWS SF Loader"
+  url: /task/aws_loader
+  schedule: every 12 hours
