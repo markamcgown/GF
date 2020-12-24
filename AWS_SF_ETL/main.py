@@ -13,10 +13,11 @@ app = Flask(__name__)
 @app.route('/')
 @app.route('/task/aws_loader')
 def load_aws():
-  env = 'PROD'
+  env = 'PROD'#
   tables = ['Users','External_User_Identifiers']
 
   for table in tables:
+    columns = []
     conn = psycopg2.connect(
         database="dbj52iqdmgels",
         user="analyst",
@@ -24,7 +25,7 @@ def load_aws():
         host="ec2-34-235-198-233.compute-1.amazonaws.com",
         port='5432'
     )
-
+    
     curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
     conn_write = snow.connect(user="PROD_USER",
@@ -69,6 +70,7 @@ def load_aws():
       if ((mem_df+mem_res)>16) or (len(df)<top):
           df_to_sf = result
           df_to_sf.columns = df_to_sf.columns.str.upper()
+          columns.extend(df_to_sf.columns.tolist())
           if len(result):
             print(f'Loading last {days} days from {str.upper(table)} to SF')
             write_pandas(conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}')
@@ -77,12 +79,15 @@ def load_aws():
 
     keys = ['ID','UPDATED_AT']
     key_columns = ','.join(keys)
-    fields = df_to_sf.columns.tolist()
-    field_columns = ','.join(fields)
-    merge_string2 = f'MERGE INTO {str.upper(table)}_{str.upper(env)} USING {str.upper(table)}_TEMP_{str.upper(env)} ON '+' AND '.join(f'{str.upper(table)}_{str.upper(env)}.{x}={str.upper(table)}_TEMP_{str.upper(env)}.{x}' for x in keys) + f' WHEN NOT MATCHED THEN INSERT ({field_columns}) VALUES ' +  '(' + ','.join(f'{str.upper(table)}_TEMP_{str.upper(env)}.{x}' for x in fields) + ')'
+    if columns:
+      fields = list(set(columns))
+      field_columns = ','.join(fields)
+      merge_string2 = f'MERGE INTO {str.upper(table)}_{str.upper(env)} USING {str.upper(table)}_TEMP_{str.upper(env)} ON '+' AND '.join(f'{str.upper(table)}_{str.upper(env)}.{x}={str.upper(table)}_TEMP_{str.upper(env)}.{x}' for x in keys) + f' WHEN NOT MATCHED THEN INSERT ({field_columns}) VALUES ' +  '(' + ','.join(f'{str.upper(table)}_TEMP_{str.upper(env)}.{x}' for x in fields) + ')'
 
-    sql = merge_string2
-    cur_write.execute(sql)
+      sql = merge_string2
+      cur_write.execute(sql)
+    else:
+      print(f'No data to load for Table: {str.upper(table)}')
 
     sql = f'DELETE FROM {str.upper(table)}_TEMP_{str.upper(env)}'
     cur_write.execute(sql)
