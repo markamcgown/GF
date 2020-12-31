@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import requests
 import snowflake.connector as snow
 from snowflake.connector.pandas_tools import write_pandas
@@ -74,6 +75,8 @@ def load_aws():
           if len(result):
             print(f'Loading last {days} days from {str.upper(table)} to SF')
             df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
+            if 'DEACTIVATED_AT' in df_to_sf.columns:
+              df_to_sf['DEACTIVATED_AT'] = df_to_sf['DEACTIVATED_AT'].fillna('sub').astype(str).replace('sub',np.nan)
             write_pandas(conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}')
           result = pd.DataFrame()
       i += top
