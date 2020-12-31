@@ -73,6 +73,7 @@ def load_aws():
           columns.extend(df_to_sf.columns.tolist())
           if len(result):
             print(f'Loading last {days} days from {str.upper(table)} to SF')
+            df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
             write_pandas(conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}')
           result = pd.DataFrame()
       i += top
