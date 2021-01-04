@@ -1,7 +1,7 @@
 service: vetdata-loader
 runtime: python38
 
-instance_class: F4_1G
+instance_class: B4_1G
 
 handlers:
 
