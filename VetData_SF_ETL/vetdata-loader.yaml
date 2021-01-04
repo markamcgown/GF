@@ -1,9 +1,12 @@
 service: vetdata-loader
 runtime: python38
 
-instance_class: F4_1G
+instance_class: B8
 
 handlers:
 
 - url: /task/loader
   script: auto
+
+inbound_services:
+- warmup
