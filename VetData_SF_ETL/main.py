@@ -8,6 +8,10 @@ from flask import Flask
 
 app = Flask(__name__)
 
+@app.route('/_ah/warmup')
+def doNothing():
+  return 'WarmedUp'
+
 @app.route('/')
 @app.route('/task/loader')
 def sfLibraries():
