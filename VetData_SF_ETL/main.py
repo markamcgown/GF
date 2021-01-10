@@ -5,6 +5,8 @@ from snowflake.connector.pandas_tools import write_pandas
 import datetime as dt
 from datetime import timedelta
 from flask import Flask
+import time
+import socket
 
 app = Flask(__name__)
 
@@ -26,6 +28,39 @@ def sfLibraries():
       installs = [i['InstallationId'] for i in r.json()]
       return installs
 
+  def make_url(mode,header,table,days,user,passw):
+    url = f'https://api.vetdata.net/v2/{table}?$filter=APIRemovedDate eq null'
+    instal = header['Installation']
+    if mode == "all":
+      url2 = url
+      print(f'Reloading table: {table}, installation: {instal}')
+    if mode == "latest":
+      print(f'Getting latest {days} days for Table: {table}, Installation: {instal}')
+      dt1 = dt.datetime.now() - timedelta(days=days)
+      dt2 = dt1.strftime('%Y-%m-%dT%H:%M:%S.%f')
+      url_temp = url + ' and (APILastChangeDate ge datetime\'<<<dt>>>\' or APICreateDate ge datetime\'<<<dt>>>\')'
+      url2 = url_temp.replace('<<<dt>>>',str(dt2))
+    url_final = url2 + '&$orderby=APICreateDate&$skip=<<<Skip>>>&$top=<<<Top>>>'
+    return url_final
+
+  class APIWrapper:
+    def poll_api(self,tries,initial_delay,delay,backoff,apifunction):
+      #time.sleep(initial_delay)
+      for n in range(tries):
+        try:
+          status = apifunction.status_code
+          if status != 200:
+            #polling_time = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
+            print("Sleeping for {0} seconds.".format(delay))
+            time.sleep(delay)
+            delay *= backoff
+          else:
+            return apifunction
+        except socket.error as e:
+          print("Connection dropped with error code{0}".format(e.errno))
+      print('No response.')#raise ExceededRetries("Failed to poll {0} within {1} tries.".format(apifunction, tries))
+
+  a = APIWrapper()
   installations = get_installations(url,user,passw)
 
   for table in tables:
@@ -54,21 +89,6 @@ def sfLibraries():
     sql = f"DELETE FROM {str.upper(table)}_TEMP_{str.upper(env)}"
     cur_write.execute(sql)
 
-    def make_url(mode,header,table,days,user,passw):
-      url = f'https://api.vetdata.net/v2/{table}?$filter=APIRemovedDate eq null'
-      instal = header['Installation']
-      if mode == "all":
-        url2 = url
-        print(f'Reloading table: {table}, installation: {instal}')
-      if mode == "latest":
-        print(f'Getting latest {days} days for table: {table}, Installation: {instal}')
-        dt1 = dt.datetime.now() - timedelta(days=days)
-        dt2 = dt1.strftime('%Y-%m-%dT%H:%M:%S.%f')
-        url_temp = url + ' and (APILastChangeDate ge datetime\'<<<dt>>>\' or APICreateDate ge datetime\'<<<dt>>>\')'
-        url2 = url_temp.replace('<<<dt>>>',str(dt2))
-      url_final = url2 + '&$orderby=APICreateDate&$skip=<<<Skip>>>&$top=<<<Top>>>'
-      return url_final
-
     top=50000
 
     for instal in installations:
@@ -84,7 +104,11 @@ def sfLibraries():
       while((i==0) or (len(df)==top)):
         url = make_url('latest',header,table,2,user,passw)
         url_mod = url.replace('<<<Skip>>>',str(i)).replace('<<<Top>>>',str(top))
-        r = requests.get(url_mod,auth=(user,passw),headers=header)
+        r = a.poll_api(7, 60, 1, 2, requests.get(url_mod,auth=(user,passw),headers=header))
+        if r is None:
+          i += top
+          print(f'Table: {table}, Installation: {instal}, will not be loaded.')
+          continue
         t = [i for i in r.json().values()]
         df = pd.json_normalize(t[1])
         mem_df = df.memory_usage(index=True).sum()/1000000
