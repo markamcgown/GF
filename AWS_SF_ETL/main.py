@@ -15,7 +15,7 @@ app = Flask(__name__)
 @app.route('/task/aws_loader')
 def load_aws():
   env = 'PROD'#
-  tables = ['Users','External_User_Identifiers']
+  tables = ['Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
 
   for table in tables:
     columns = []
@@ -65,6 +65,7 @@ def load_aws():
       curs.execute(sql)
       data = curs.fetchall()
       df=pd.DataFrame([i.copy() for i in data])
+      # return df
       mem_df = df.memory_usage(index=True).sum()/1000000
       result = result.append(df,ignore_index=True)
       mem_res = result.memory_usage(index=True).sum()/1000000
@@ -77,6 +78,8 @@ def load_aws():
             df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
             if 'DEACTIVATED_AT' in df_to_sf.columns:
               df_to_sf['DEACTIVATED_AT'] = df_to_sf['DEACTIVATED_AT'].fillna('sub').astype(str).replace('sub',np.nan)
+            if 'OCCURRED_ON' in df_to_sf.columns:
+              df_to_sf['OCCURRED_ON'] = df_to_sf['OCCURRED_ON'].fillna('sub').astype(str).replace('sub',np.nan)
             write_pandas(conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}')
           result = pd.DataFrame()
       i += top
