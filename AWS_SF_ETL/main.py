@@ -15,7 +15,8 @@ app = Flask(__name__)
 @app.route('/task/aws_loader')
 def load_aws():
   env = 'PROD'#
-  tables = ['Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
+  tables = ['User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
+  sub_col = ['DEACTIVATED_AT','OCCURRED_ON','EXPIRY']
 
   for table in tables:
     columns = []
@@ -52,6 +53,9 @@ def load_aws():
 
     sql = f'DELETE FROM {str.upper(table)}_TEMP_{str.upper(env)}'
     cur_write.execute(sql)
+
+    # sql = f'DELETE FROM {str.upper(table)}_{str.upper(env)}'
+    # cur_write.execute(sql)
     
     top=50000
     i=0
@@ -76,10 +80,8 @@ def load_aws():
           if len(result):
             print(f'Loading last {days} days from {str.upper(table)} to SF')
             df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
-            if 'DEACTIVATED_AT' in df_to_sf.columns:
-              df_to_sf['DEACTIVATED_AT'] = df_to_sf['DEACTIVATED_AT'].fillna('sub').astype(str).replace('sub',np.nan)
-            if 'OCCURRED_ON' in df_to_sf.columns:
-              df_to_sf['OCCURRED_ON'] = df_to_sf['OCCURRED_ON'].fillna('sub').astype(str).replace('sub',np.nan)
+            for col in list(set(sub_col) & set(df_to_sf.columns)):
+              df_to_sf[col] = df_to_sf[col].fillna('sub').astype(str).replace('sub',np.nan)
             write_pandas(conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}')
           result = pd.DataFrame()
       i += top
