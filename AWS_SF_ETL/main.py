@@ -15,8 +15,8 @@ app = Flask(__name__)
 @app.route('/task/aws_loader')
 def load_aws():
   env = 'PROD'#
-  tables = ['User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
-  sub_col = ['DEACTIVATED_AT','OCCURRED_ON','EXPIRY']
+  tables = ['Promotions','User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
+  sub_col = ['DEACTIVATED_AT','OCCURRED_ON','EXPIRY','START_DATE','END_DATE']
 
   for table in tables:
     columns = []
@@ -54,9 +54,6 @@ def load_aws():
     sql = f'DELETE FROM {str.upper(table)}_TEMP_{str.upper(env)}'
     cur_write.execute(sql)
 
-    # sql = f'DELETE FROM {str.upper(table)}_{str.upper(env)}'
-    # cur_write.execute(sql)
-    
     top=50000
     i=0
     days = 2
