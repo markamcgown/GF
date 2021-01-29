@@ -15,7 +15,8 @@ app = Flask(__name__)
 @app.route('/task/aws_loader')
 def load_aws():
   env = 'PROD'#
-  tables = ['Vet_Data_Patients','Plans','Clinics','Pets','Promotions','User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
+  tables = ['User_Promotion_Claims','Vet_Data_Patients','Plans','Clinics','Pets','Promotions','User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
+  no_ins_tables = ['User_Promotion_Claims']
   sub_col = ['DEACTIVATED_AT','OCCURRED_ON','EXPIRY','START_DATE','END_DATE','DATE_OF_BIRTH','DELETED_AT','SOURCE_CREATED_AT','DATE_OF_DEATH','FIRST_VISIT_DATE','LAST_TRANSACTION_DATE','SOURCE_UPDATED_AT','SOURCE_REMOVED_AT']
 
   for table in tables:
@@ -62,11 +63,13 @@ def load_aws():
     result = pd.DataFrame()
     while((i==0) or (len(df)==top)):
       start_time = (dt.datetime.now()-timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
-      sql=f'SELECT * FROM {str.upper(table)} WHERE INSERTED_AT > \'{start_time}\' OR UPDATED_AT > \'{start_time}\' LIMIT {top} OFFSET {i}'	
+      if table in no_ins_tables:
+        sql=f'SELECT * FROM {str.upper(table)} LIMIT {top} OFFSET {i}'	
+      else:
+        sql=f'SELECT * FROM {str.upper(table)} WHERE INSERTED_AT >= \'{start_time}\' OR UPDATED_AT >= \'{start_time}\' LIMIT {top} OFFSET {i}'	
       curs.execute(sql)
       data = curs.fetchall()
       df=pd.DataFrame([i.copy() for i in data])
-      # return df
       mem_df = df.memory_usage(index=True).sum()/1000000
       result = result.append(df,ignore_index=True)
       mem_res = result.memory_usage(index=True).sum()/1000000
@@ -75,15 +78,21 @@ def load_aws():
           df_to_sf.columns = df_to_sf.columns.str.upper()
           columns.extend(df_to_sf.columns.tolist())
           if len(result):
-            print(f'Loading last {days} days from {str.upper(table)} to SF')
-            df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
+            if table not in no_ins_tables:
+              print(f'Loading last {days} days from {str.upper(table)} to SF, rows {i} to {top+i}.')
+              df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
+            else:
+              print(f'Loading from {str.upper(table)} to SF, rows {i} to {top+i}.')
             for col in list(set(sub_col) & set(df_to_sf.columns)):
               df_to_sf[col] = df_to_sf[col].fillna('sub').astype(str).replace('sub',np.nan)
             write_pandas(conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}')
           result = pd.DataFrame()
       i += top
 
-    keys = ['ID','UPDATED_AT']
+    if table in no_ins_tables:
+      keys = ['ID']
+    else:
+      keys = ['ID','UPDATED_AT']
     key_columns = ','.join(keys)
     if columns:
       fields = list(set(columns))
