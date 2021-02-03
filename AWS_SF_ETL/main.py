@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 import requests
+import re
 import snowflake.connector as snow
+from snowflake.connector.errors import DatabaseError, ProgrammingError
 from snowflake.connector.pandas_tools import write_pandas
 import datetime as dt
 import psycopg2
@@ -15,7 +17,7 @@ app = Flask(__name__)
 @app.route('/task/aws_loader')
 def load_aws():
   env = 'PROD'#
-  tables = ['User_Promotion_Claims','Vet_Data_Patients','Plans','Clinics','Pets','Promotions','User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
+  tables = ['Promo_Codes','User_Promotion_Claims','Vet_Data_Patients','Plans','Clinics','Pets','Promotions','User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
   no_ins_tables = ['User_Promotion_Claims']
   sub_col = ['DEACTIVATED_AT','OCCURRED_ON','EXPIRY','START_DATE','END_DATE','DATE_OF_BIRTH','DELETED_AT','SOURCE_CREATED_AT','DATE_OF_DEATH','FIRST_VISIT_DATE','LAST_TRANSACTION_DATE','SOURCE_UPDATED_AT','SOURCE_REMOVED_AT']
 
@@ -28,6 +30,62 @@ def load_aws():
         host="ec2-34-235-198-233.compute-1.amazonaws.com",
         port='5432'
     )
+
+    def get_field_types(table,column):
+      sql='''
+      select table_name,UPPER(column_name) AS column_name,ordinal_position,data_type,character_maximum_length,
+      CASE
+      WHEN UDT_NAME LIKE 'int%' OR UDT_NAME LIKE '_int%' THEN 'INTEGER'
+      WHEN (UDT_NAME LIKE '%text' OR UDT_NAME='varchar' OR UDT_NAME LIKE '%status%') AND CHARACTER_MAXIMUM_LENGTH IS NOT NULL THEN CONCAT('VARCHAR (',CHARACTER_MAXIMUM_LENGTH,')')
+      WHEN UDT_NAME='bool' THEN 'BOOLEAN'
+      WHEN UDT_NAME='timestamp' THEN 'TIMESTAMP'
+      WHEN UDT_NAME LIKE 'float%' THEN 'FLOAT'
+      ELSE 'VARCHAR (10000)'
+      END AS TYPE
+      from information_schema.columns
+      where table_name = '<<<Table>>>'
+      and column_name = '<<<Column>>>'
+      '''
+      sql_mod = sql.replace('<<<Table>>>',table.lower()).replace('<<<Column>>>',column.lower())
+      curs.execute(sql_mod)
+      data = curs.fetchall()
+      df=pd.DataFrame([i.copy() for i in data])
+      return df['type'].values[0]
+
+    def try_write(sqlMethod,temp=False,missing_fields=[]):
+      j=0
+      temps=''
+      if temp:
+        temps='TEMP_'
+      while j<10:
+        try:
+          if temp:
+            conn_write,df,table_temp = sqlMethod[0],sqlMethod[1],sqlMethod[2]
+            write_pandas(conn_write, df,table_temp)
+            print('Successfully written to Temp.')
+          else:
+            tablex,envx,field_columnsx,keysx,fieldsx=sqlMethod[0],sqlMethod[1],sqlMethod[2],sqlMethod[3],sqlMethod[4]
+            keysx.extend(missing_fields)
+            keysx = list(set(keysx))
+            merge_string = f'MERGE INTO {str.upper(tablex)}_{str.upper(envx)} USING {str.upper(tablex)}_TEMP_{str.upper(envx)} ON '+' AND '.join(f'{str.upper(tablex)}_{str.upper(envx)}.{x}={str.upper(tablex)}_TEMP_{str.upper(envx)}.{x}' for x in keysx) + f' WHEN NOT MATCHED THEN INSERT ({field_columnsx}) VALUES ' +  '(' + ','.join(f'{str.upper(tablex)}_TEMP_{str.upper(envx)}.{x}' for x in fieldsx) + ')'
+            cur_write.execute(merge_string)
+            print('Successfully merged unique rows.')
+          j=10
+        except DatabaseError as db_ex:
+          if db_ex.errno == 904:
+            print(db_ex.msg)
+            field = re.search('\'(.*?)\'',db_ex.msg).group(0).strip('\'')
+            missing_fields.append(field)
+            if field in fields:
+              type=get_field_types(table,field)
+              sql2=f'ALTER TABLE {str.upper(table)}_{str.upper(temps)}{str.upper(env)} ADD {str.upper(field)} {str.upper(type)}'
+              try:
+                cur_write.execute(sql2)
+                print(f'{str.upper(field)} added to {str.upper(table)}_{str.upper(temps)}{str.upper(env)} as {str.upper(type)}.')
+              except DatabaseError as db_ex:
+                print(db_ex.msg)
+          j+=1
+      return missing_fields
     
     curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
@@ -58,6 +116,7 @@ def load_aws():
     top=50000
     i=0
     days = 2
+    missing_fields = []
 
     df = pd.DataFrame()
     result = pd.DataFrame()
@@ -70,6 +129,8 @@ def load_aws():
       curs.execute(sql)
       data = curs.fetchall()
       df=pd.DataFrame([i.copy() for i in data])
+      # if len(df):
+      #   return df
       mem_df = df.memory_usage(index=True).sum()/1000000
       result = result.append(df,ignore_index=True)
       mem_res = result.memory_usage(index=True).sum()/1000000
@@ -85,7 +146,7 @@ def load_aws():
               print(f'Loading from {str.upper(table)} to SF, rows {i} to {top+i}.')
             for col in list(set(sub_col) & set(df_to_sf.columns)):
               df_to_sf[col] = df_to_sf[col].fillna('sub').astype(str).replace('sub',np.nan)
-            write_pandas(conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}')
+            missing_fields = try_write([conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}'],True)
           result = pd.DataFrame()
       i += top
 
@@ -93,14 +154,11 @@ def load_aws():
       keys = ['ID']
     else:
       keys = ['ID','UPDATED_AT']
-    key_columns = ','.join(keys)
+    keys.extend(missing_fields)
     if columns:
       fields = list(set(columns))
       field_columns = ','.join(fields)
-      merge_string2 = f'MERGE INTO {str.upper(table)}_{str.upper(env)} USING {str.upper(table)}_TEMP_{str.upper(env)} ON '+' AND '.join(f'{str.upper(table)}_{str.upper(env)}.{x}={str.upper(table)}_TEMP_{str.upper(env)}.{x}' for x in keys) + f' WHEN NOT MATCHED THEN INSERT ({field_columns}) VALUES ' +  '(' + ','.join(f'{str.upper(table)}_TEMP_{str.upper(env)}.{x}' for x in fields) + ')'
-
-      sql = merge_string2
-      cur_write.execute(sql)
+      try_write([table,env,field_columns,keys,fields])
     else:
       print(f'No data to load for Table: {str.upper(table)}')
 
