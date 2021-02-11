@@ -159,6 +159,10 @@ def load_aws():
       fields = list(set(columns))
       field_columns = ','.join(fields)
       try_write([table,env,field_columns,keys,fields])
+      if 'UPDATED_AT' in keys:
+        unique_constraint = f'DELETE FROM {str.upper(table)}_{str.upper(env)} T USING (SELECT ID,UPDATED_AT,ROW_NUMBER() OVER (PARTITION BY ID ORDER BY UPDATED_AT DESC) AS RANK_IN_KEY FROM {str.upper(table)}_{str.upper(env)} T) X WHERE X.RANK_IN_KEY <> 1 AND T.ID = X.ID AND T.UPDATED_AT = X.UPDATED_AT'
+        cur_write.execute(unique_constraint)
+        print(f'Older ID\'s in {str.upper(table)}_{str.upper(env)} have been cleaned up')
     else:
       print(f'No data to load for Table: {str.upper(table)}')
 
