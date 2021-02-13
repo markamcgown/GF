@@ -35,6 +35,7 @@ def load_aws():
       sql='''
       select table_name,UPPER(column_name) AS column_name,ordinal_position,data_type,character_maximum_length,
       CASE
+      WHEN DATA_TYPE LIKE 'ARRAY' THEN 'ARRAY'
       WHEN UDT_NAME LIKE 'int%' OR UDT_NAME LIKE '_int%' THEN 'INTEGER'
       WHEN (UDT_NAME LIKE '%text' OR UDT_NAME='varchar' OR UDT_NAME LIKE '%status%') AND CHARACTER_MAXIMUM_LENGTH IS NOT NULL THEN CONCAT('VARCHAR (',CHARACTER_MAXIMUM_LENGTH,')')
       WHEN UDT_NAME='bool' THEN 'BOOLEAN'
@@ -57,7 +58,8 @@ def load_aws():
       temps=''
       if temp:
         temps='TEMP_'
-      while j<10:
+      max_columns = 50
+      while j<max_columns:
         try:
           if temp:
             conn_write,df,table_temp = sqlMethod[0],sqlMethod[1],sqlMethod[2]
@@ -70,20 +72,20 @@ def load_aws():
             merge_string = f'MERGE INTO {str.upper(tablex)}_{str.upper(envx)} USING {str.upper(tablex)}_TEMP_{str.upper(envx)} ON '+' AND '.join(f'{str.upper(tablex)}_{str.upper(envx)}.{x}={str.upper(tablex)}_TEMP_{str.upper(envx)}.{x}' for x in keysx) + f' WHEN NOT MATCHED THEN INSERT ({field_columnsx}) VALUES ' +  '(' + ','.join(f'{str.upper(tablex)}_TEMP_{str.upper(envx)}.{x}' for x in fieldsx) + ')'
             cur_write.execute(merge_string)
             print('Successfully merged unique rows.')
-          j=10
+          j=max_columns
         except DatabaseError as db_ex:
           if db_ex.errno == 904:
             print(db_ex.msg)
             field = re.search('\'(.*?)\'',db_ex.msg).group(0).strip('\'')
             missing_fields.append(field)
-            if field in fields:
-              type=get_field_types(table,field)
-              sql2=f'ALTER TABLE {str.upper(table)}_{str.upper(temps)}{str.upper(env)} ADD {str.upper(field)} {str.upper(type)}'
-              try:
-                cur_write.execute(sql2)
-                print(f'{str.upper(field)} added to {str.upper(table)}_{str.upper(temps)}{str.upper(env)} as {str.upper(type)}.')
-              except DatabaseError as db_ex:
-                print(db_ex.msg)
+            # if field in fields:
+            type=get_field_types(table,field)
+            sql2=f'ALTER TABLE {str.upper(table)}_{str.upper(temps)}{str.upper(env)} ADD {str.upper(field)} {str.upper(type)}'
+            try:
+              cur_write.execute(sql2)
+              print(f'{str.upper(field)} added to {str.upper(table)}_{str.upper(temps)}{str.upper(env)} as {str.upper(type)}.')
+            except DatabaseError as db_ex:
+              print(db_ex.msg)
           j+=1
       return missing_fields
     
