@@ -17,9 +17,9 @@ app = Flask(__name__)
 @app.route('/task/aws_loader')
 def load_aws():
   env = 'PROD'#
-  tables = ['Vet_Support_Usages','Telehealth_Payments','Plan_Changes','Promo_Codes','User_Promotion_Claims','Vet_Data_Patients','Plans','Clinics','Pets','Promotions','User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
+  tables = ['Invoices','Vet_Support_Usages','Telehealth_Payments','Plan_Changes','Promo_Codes','User_Promotion_Claims','Vet_Data_Patients','Plans','Clinics','Pets','Promotions','User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
   no_ins_tables = ['User_Promotion_Claims']
-  sub_col = ['DEACTIVATED_AT','OCCURRED_ON','EXPIRY','START_DATE','END_DATE','DATE_OF_BIRTH','DELETED_AT','SOURCE_CREATED_AT','DATE_OF_DEATH','FIRST_VISIT_DATE','LAST_TRANSACTION_DATE','SOURCE_UPDATED_AT','SOURCE_REMOVED_AT']
+  sub_col = ['DATETIME','DEACTIVATED_AT','OCCURRED_ON','EXPIRY','START_DATE','END_DATE','DATE_OF_BIRTH','DELETED_AT','SOURCE_CREATED_AT','DATE_OF_DEATH','FIRST_VISIT_DATE','LAST_TRANSACTION_DATE','SOURCE_UPDATED_AT','SOURCE_REMOVED_AT']
 
   for table in tables:
     columns = []
@@ -96,7 +96,7 @@ def load_aws():
     account="cv52121.us-central1.gcp",
     warehouse="VET_DATA_WAREHOUSE",
     database="VET_DB",
-    schema="VET_SCHEMA")
+    schema="AWS_SCHEMA")
 
     cur_write = conn_write.cursor()
 
@@ -109,7 +109,7 @@ def load_aws():
     sql = "USE DATABASE VET_DB"
     cur_write.execute(sql)
 
-    sql = "USE SCHEMA VET_SCHEMA"
+    sql = "USE SCHEMA AWS_SCHEMA"
     cur_write.execute(sql)
 
     sql = f'DELETE FROM {str.upper(table)}_TEMP_{str.upper(env)}'
