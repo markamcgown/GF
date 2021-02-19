@@ -10,7 +10,6 @@ import psycopg2
 import psycopg2.extras
 from datetime import timedelta
 from flask import Flask
-
 app = Flask(__name__)
 
 @app.route('/')
@@ -117,9 +116,9 @@ def load_aws():
 
     top=50000
     i=0
+
     days = 2
     missing_fields = []
-
     df = pd.DataFrame()
     result = pd.DataFrame()
     while((i==0) or (len(df)==top)):
@@ -131,25 +130,20 @@ def load_aws():
       curs.execute(sql)
       data = curs.fetchall()
       df=pd.DataFrame([i.copy() for i in data])
-      # if len(df):
-      #   return df
-      mem_df = df.memory_usage(index=True).sum()/1000000
       result = result.append(df,ignore_index=True)
-      mem_res = result.memory_usage(index=True).sum()/1000000
-      if ((mem_df+mem_res)>16) or (len(df)<top):
-          df_to_sf = result
-          df_to_sf.columns = df_to_sf.columns.str.upper()
-          columns.extend(df_to_sf.columns.tolist())
-          if len(result):
-            if table not in no_ins_tables:
-              print(f'Loading last {days} days from {str.upper(table)} to SF, rows {i} to {top+i}.')
-              df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
-            else:
-              print(f'Loading from {str.upper(table)} to SF, rows {i} to {top+i}.')
-            for col in list(set(sub_col) & set(df_to_sf.columns)):
-              df_to_sf[col] = df_to_sf[col].fillna('sub').astype(str).replace('sub',np.nan)
-            missing_fields = try_write([conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}'],True)
-          result = pd.DataFrame()
+      df_to_sf = result
+      df_to_sf.columns = df_to_sf.columns.str.upper()
+      columns.extend(df_to_sf.columns.tolist())
+      if len(result):
+        if table not in no_ins_tables:
+          print(f'Loading last {days} days from {str.upper(table)} to SF, rows {i} to {top+i}.')
+          df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
+        else:
+          print(f'Loading from {str.upper(table)} to SF, rows {i} to {top+i}.')
+        for col in list(set(sub_col) & set(df_to_sf.columns)):
+          df_to_sf[col] = df_to_sf[col].fillna('sub').astype(str).replace('sub',np.nan)
+        missing_fields = try_write([conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}'],True)
+      result = pd.DataFrame()
       i += top
 
     if table in no_ins_tables:
