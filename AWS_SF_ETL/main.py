@@ -10,6 +10,7 @@ import psycopg2
 import psycopg2.extras
 from datetime import timedelta
 from flask import Flask
+import pdb
 app = Flask(__name__)
 
 @app.route('/')
@@ -18,7 +19,6 @@ def load_aws():
   env = 'PROD'#
   tables = ['Vet_Data_Emails','Vet_Data_Clients','Invoices','Vet_Support_Usages','Telehealth_Payments','Plan_Changes','Promo_Codes','User_Promotion_Claims','Vet_Data_Patients','Plans','Clinics','Pets','Promotions','User_Checklist_Group_Records','User_Checklist_Item_Records','Pet_Checklist_Group_Records','Pet_Checklist_Item_Records','Claims','Rewards','Withdrawals','User_Promotions','Users','External_User_Identifiers']
   no_ins_tables = ['User_Promotion_Claims']
-  sub_col = ['DATETIME','DEACTIVATED_AT','OCCURRED_ON','EXPIRY','START_DATE','END_DATE','DATE_OF_BIRTH','DELETED_AT','SOURCE_CREATED_AT','DATE_OF_DEATH','FIRST_VISIT_DATE','LAST_TRANSACTION_DATE','SOURCE_UPDATED_AT','SOURCE_REMOVED_AT']
 
   for table in tables:
     columns = []
@@ -73,11 +73,10 @@ def load_aws():
             print('Successfully merged unique rows.')
           j=max_columns
         except DatabaseError as db_ex:
+          print(db_ex.msg)
           if db_ex.errno == 904:
-            print(db_ex.msg)
             field = re.search('\'(.*?)\'',db_ex.msg).group(0).strip('\'')
             missing_fields.append(field)
-            # if field in fields:
             type=get_field_types(table,field)
             sql2=f'ALTER TABLE {str.upper(table)}_{str.upper(temps)}{str.upper(env)} ADD {str.upper(field)} {str.upper(type)}'
             try:
@@ -137,11 +136,12 @@ def load_aws():
       if len(result):
         if table not in no_ins_tables:
           print(f'Loading last {days} days from {str.upper(table)} to SF, rows {i} to {top+i}.')
-          df_to_sf['UPDATED_AT'],df_to_sf['INSERTED_AT']  = df_to_sf['UPDATED_AT'].astype(str),df_to_sf['INSERTED_AT'].astype(str)
+          for c in [i for i in df_to_sf.columns if pd._libs.tslibs.nattype.NaTType in [type(item) for item in df_to_sf[i]]]:
+            df_to_sf[c] = df_to_sf[c].fillna('sub').astype(str).replace('sub',np.nan)
+          for c in [i for i in df_to_sf.columns if pd._libs.tslibs.timestamps.Timestamp in [type(item) for item in df_to_sf[i]]]:
+            df_to_sf[c] = df_to_sf[c].astype(str)
         else:
           print(f'Loading from {str.upper(table)} to SF, rows {i} to {top+i}.')
-        for col in list(set(sub_col) & set(df_to_sf.columns)):
-          df_to_sf[col] = df_to_sf[col].fillna('sub').astype(str).replace('sub',np.nan)
         missing_fields = try_write([conn_write, df_to_sf, str.upper(table) + f'_TEMP_{str.upper(env)}'],True)
       result = pd.DataFrame()
       i += top
